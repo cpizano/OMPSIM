@@ -143,6 +143,7 @@
   <ItemGroup>
     <ClInclude Include="Resource.h" />
     <ClInclude Include="src\ompsim.h" />
+    <ClInclude Include="src\omp_utils.h" />
     <ClInclude Include="src\stdafx.h" />
   </ItemGroup>
   <ItemGroup>
