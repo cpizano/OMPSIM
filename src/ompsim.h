@@ -33,6 +33,7 @@ public:
 
   SimTime() : st_(0) {}
   explicit SimTime(int64_t u_seconds) :st_(u_seconds) {}
+  int64_t as_seconds() const { return st_ / 100; }
 
   bool operator==(const SimTime& other) const { return st_ == other.st_; }
   bool operator<(const SimTime& other) const { return st_ < other.st_; }
@@ -45,6 +46,10 @@ public:
 
   friend SimTime operator+(const SimTime& time, int64_t u_seconds) {
     return SimTime(time) += u_seconds;
+  }
+
+  friend int64_t operator-(const SimTime& time1, const SimTime& time2) {
+    return time1.st_ - time2.st_;
   }
 
   std::string format() const {
@@ -132,6 +137,10 @@ public:
   int random_uniform_number(int min, int max) {
     std::uniform_int_distribution<> dis(min, max);
     return dis(randgen_);
+  }
+
+  int hour_of_day() const {
+    return int(SimTime::now().as_seconds() / 3600 ) % 24;
   }
 };
 
