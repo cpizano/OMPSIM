@@ -4,6 +4,7 @@
 #include "stdafx.h"
 
 #include <memory>
+#include <forward_list>
 
 #include "ompsim.h"
 #include "resource.h"
@@ -17,6 +18,46 @@ namespace OMP {
 const int kmin  = 60;
 const int khour = 60 * kmin;
 const int kdays = 365;
+
+class TimeTable : public Actor {
+  struct Node {
+    Actor* actor;
+    uint32_t id;
+  };
+
+  int every_;
+  std::vector<std::forward_list<Node>> nodes_;
+
+public:
+  TimeTable(int every_mins) : every_(every_mins), nodes_(24 * kmin / every_mins) {
+  }
+
+  void add_event(Scheduler* sched, Actor* actor, int when_mins, uint32_t id) {
+    auto slot =  when_mins / every_;
+    if (nodes_[slot].empty())
+      sched->add_event(slot * every_ * kmin, this, slot);
+    nodes_[slot].push_front({actor, id});
+  }
+
+  void remove_actor(const Actor* actor) {
+    for (auto& slot : nodes_) {
+      std::remove_if(begin(slot), end(slot), [actor](const Node& node) {
+        return actor == node.actor;
+      });
+    }
+  }
+
+private:
+  void on_event(Scheduler* sched, SimTime btime, uint32_t slot) override {
+    if (nodes_[slot].empty())
+      return;
+    for (auto& node : nodes_[slot]) {
+      node.actor->on_event(sched, btime, node.id);
+    }
+    auto next_secs = (slot * every_ * kmin) + (24 * khour);
+    sched->add_event(next_secs, this, slot);
+  }
+};
 
 class Person : public Actor {
   int age_;      // days.
@@ -103,7 +144,7 @@ class OMPSim : public Simulation {
   std::vector<std::unique_ptr<Person>> people_;
 
   int prime(Scheduler* sched) override {
-    for (int ix = 0; ix != 100; ++ix) {
+    for (int ix = 0; ix != 10; ++ix) {
       people_.push_back(std::make_unique<Person>(sched));
     }
     return 0;
