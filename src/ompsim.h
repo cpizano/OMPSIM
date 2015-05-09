@@ -9,6 +9,30 @@
 
 #include "omp_utils.h"
 
+#define OMP_SIM_GLOBALS \
+omp::SimTime* omp::SimTime::g_master = nullptr;
+
+namespace omp {
+
+template <typename T>
+T to_days_years(T years) {
+  return 365 * years;
+}
+
+template <typename T>
+T to_seconds_hours(T hours) {
+  return 3600 * hours;
+}
+
+template <typename T>
+T to_seconds_mins(T minutes) {
+  return 60 * minutes;
+}
+
+int to_minutes_hhmm(char hour, char mins) {
+  return (60 * hour) + mins;
+}
+
 // Represents time in microseconds. That is about 292K years.
 class SimTime {
   int64_t st_;
@@ -53,7 +77,6 @@ public:
   }
 
   std::string format() const {
-
     auto fus  = st_ % 100;
     auto sec = st_ / 100;
     auto min = sec / 60;
@@ -144,6 +167,47 @@ public:
   }
 };
 
+class DailyTimeTable : public Actor {
+  struct Node {
+    Actor* actor;
+    uint32_t id;
+  };
+
+  int every_;
+  std::vector<std::forward_list<Node>> nodes_;
+
+public:
+  DailyTimeTable(int every_mins) 
+      : every_(every_mins), nodes_(24 * 60 / every_mins) {
+  }
+
+  void add_event(Scheduler* sched, Actor* actor, int when_mins, uint32_t id) {
+    auto slot =  when_mins / every_;
+    if (nodes_[slot].empty())
+      sched->add_event(to_seconds_mins(slot * every_), this, slot);
+    nodes_[slot].push_front({actor, id});
+  }
+
+  void remove_actor(const Actor* actor) {
+    for (auto& slot : nodes_) {
+      std::remove_if(begin(slot), end(slot), [actor](const Node& node) {
+        return actor == node.actor;
+      });
+    }
+  }
+
+private:
+  void on_event(Scheduler* sched, SimTime btime, uint32_t slot) override {
+    if (nodes_[slot].empty())
+      return;
+    for (auto& node : nodes_[slot]) {
+      node.actor->on_event(sched, btime, node.id);
+    }
+    sched->add_event(to_seconds_hours(24), this, slot);
+  }
+};
+
+
 class Simulation {
   Scheduler sched_;
 
@@ -178,3 +242,5 @@ private:
   }
 
 };
+
+}  // namespace omp.
