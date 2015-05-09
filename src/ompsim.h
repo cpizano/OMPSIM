@@ -33,6 +33,21 @@ int to_minutes_hhmm(char hour, char mins) {
   return (60 * hour) + mins;
 }
 
+class RandomUniform {
+  std::random_device randdev_;
+  std::mt19937 randgen_;
+
+public:
+  RandomUniform() : randgen_(randdev_()) {}
+
+  int gen_int(int min, int max) {
+    std::uniform_int_distribution<> dis(min, max);
+    return dis(randgen_);
+  }
+
+};
+
+
 // Represents time in microseconds. That is about 292K years.
 class SimTime {
   int64_t st_;
@@ -131,11 +146,9 @@ public:
 
 class Scheduler {
   std::priority_queue<SimEvent, std::vector<SimEvent>, std::greater<SimEvent>> pqueue_;
-  std::random_device randdev_;
-  std::mt19937 randgen_;
 
 public:
-  Scheduler() : randgen_(randdev_()) { }
+  Scheduler() { }
 
   bool empty() const { return pqueue_.empty(); }
 
@@ -150,16 +163,6 @@ public:
   void add_event(int delta_seconds, Actor* actor, uint32_t id) {
     auto activation_time = SimTime::now() + (100 * uint64_t(delta_seconds));
     pqueue_.emplace(activation_time, actor, id);
-  }
-
-  SimTime random_uniform_seconds(int min_sec, int max_sec) {
-    std::uniform_int_distribution<uint64_t> dis(min_sec, max_sec);
-    return SimTime(100 * dis(randgen_));
-  }
-
-  int random_uniform_number(int min, int max) {
-    std::uniform_int_distribution<> dis(min, max);
-    return dis(randgen_);
   }
 
   int hour_of_day() const {

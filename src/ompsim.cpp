@@ -12,6 +12,8 @@
 OMP_SIM_GLOBALS
 
 
+omp::RandomUniform random;
+
 class Person : public omp::Actor {
   int age_;      // days.
   int energy_;   // calories.
@@ -39,10 +41,10 @@ public:
         energy_(0),
         weight_(0),
         prev_(none) {
-    age_ = omp::to_days_years(sched->random_uniform_number(20, 90));
-    weight_ = sched->random_uniform_number(90, 220);
+    age_ = omp::to_days_years(random.gen_int(20, 90));
+    weight_ = random.gen_int(90, 220);
     energy_ = 2 * (weight_ * 13);
-    auto wakeup_time = omp::to_seconds_hours(sched->random_uniform_number(4, 8));
+    auto wakeup_time = omp::to_seconds_hours(random.gen_int(4, 8));
     sched->add_event(wakeup_time, this, awake);
   }
 
@@ -54,35 +56,35 @@ protected:
 
     if (id == awake) {
       energy_ -= 15 * int((omp::SimTime::now() - btime) / (10 * 3600));
-      auto awake_time = omp::to_seconds_mins(sched->random_uniform_number(30, 60));
+      auto awake_time = omp::to_seconds_mins(random.gen_int(30, 60));
       sched->add_event(awake_time, this, eating);
     } else if (id == eating) {
-      auto eating_time = omp::to_seconds_mins(sched->random_uniform_number(10, 40));
-      energy_ += sched->random_uniform_number(300, 800);
+      auto eating_time = omp::to_seconds_mins(random.gen_int(10, 40));
+      energy_ += random.gen_int(300, 800);
       if (prev_ = awake) {
         sched->add_event(eating_time, this, going_work);
       } else {
         sched->add_event(eating_time, this, working);
       }
     } else if (id == going_work) {
-      auto move_time = omp::to_seconds_mins(sched->random_uniform_number(15, 80));
+      auto move_time = omp::to_seconds_mins(random.gen_int(15, 80));
       sched->add_event(move_time, this, working);
     } else if (id == working) {
       energy_ -= 15 * int((omp::SimTime::now() - btime) / (10 * 3600));
-      auto work_time = omp::to_seconds_hours(sched->random_uniform_number(2, 4));
+      auto work_time = omp::to_seconds_hours(random.gen_int(2, 4));
       if (sched->hour_of_day() < 18) {
         sched->add_event(work_time, this, eating);
       } else {
         sched->add_event(work_time, this, going_home);
       }
     } else if (id == going_home) {
-      auto move_time = omp::to_seconds_mins(sched->random_uniform_number(15, 80));
+      auto move_time = omp::to_seconds_mins(random.gen_int(15, 80));
       sched->add_event(move_time, this, relaxing);
     } else if (id == relaxing) {
-      auto relax_time = omp::to_seconds_mins(sched->random_uniform_number(60, 90));
+      auto relax_time = omp::to_seconds_mins(random.gen_int(60, 90));
       sched->add_event(relax_time, this, sleeping);
     } else if (id == sleeping) {
-      auto sleep_time = omp::to_seconds_hours(sched->random_uniform_number(5, 9));
+      auto sleep_time = omp::to_seconds_hours(random.gen_int(5, 9));
       sched->add_event(awake, this, sleeping);
     } else {
       __debugbreak();
