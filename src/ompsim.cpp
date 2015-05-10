@@ -11,8 +11,25 @@
 
 OMP_SIM_GLOBALS
 
-
 omp::RandomUniform random;
+
+class Bureaucrat {
+public:
+  enum {
+    go_work = __LINE__,
+    lunch_break,
+    go_home
+  };
+
+  static void become(omp::Scheduler* sched, omp::Actor* actor, int travel_time_am_min) {
+    auto go_time = omp::to_minutes_hhmm(8, 0) - travel_time_am_min;
+    sched->time_table().add_event(actor, go_time, go_work);
+    auto ln_time = omp::to_minutes_hhmm(12, 0) - travel_time_am_min;
+    sched->time_table().add_event(actor, ln_time, lunch_break);
+    auto ret_time = omp::to_minutes_hhmm(17, 0);
+    sched->time_table().add_event(actor, ret_time, go_home);
+  }
+};
 
 class Person : public omp::Actor {
   int age_;      // days.
@@ -23,13 +40,11 @@ class Person : public omp::Actor {
 
 public:
   enum States {
-    none,
+    none = __LINE__,
     dead,
     sleeping,
     awake,
-    eating,
-    going_work,
-    going_home,
+    breakfasting,
     working,
     relaxing,
   };
@@ -44,8 +59,10 @@ public:
     age_ = omp::to_days_years(random.gen_int(20, 90));
     weight_ = random.gen_int(90, 220);
     energy_ = 2 * (weight_ * 13);
-    auto wakeup_time = omp::to_seconds_hours(random.gen_int(4, 8));
+    auto wakeup_time = omp::to_seconds_hours(random.gen_int(4, 7));
     sched->add_event(wakeup_time, this, awake);
+    // born a a bureaucrat.
+    Bureaucrat::become(sched, this, 10);
   }
 
 protected:
@@ -55,35 +72,32 @@ protected:
     auto t2 = sched->hour_of_day();
 
     if (id == awake) {
+      // cleanup then eat.
       energy_ -= 15 * int((omp::SimTime::now() - btime) / (10 * 3600));
       auto awake_time = omp::to_seconds_mins(random.gen_int(30, 60));
-      sched->add_event(awake_time, this, eating);
-    } else if (id == eating) {
-      auto eating_time = omp::to_seconds_mins(random.gen_int(10, 40));
+      sched->add_event(awake_time, this, breakfasting);
+    } else if (id == breakfasting) {
       energy_ += random.gen_int(300, 800);
-      if (prev_ = awake) {
-        sched->add_event(eating_time, this, going_work);
-      } else {
-        sched->add_event(eating_time, this, working);
-      }
-    } else if (id == going_work) {
+    } else if (id == Bureaucrat::go_work) {
+      // conmute then work.
       auto move_time = omp::to_seconds_mins(random.gen_int(15, 80));
       sched->add_event(move_time, this, working);
     } else if (id == working) {
+      // work, possibly until lunch break.
       energy_ -= 15 * int((omp::SimTime::now() - btime) / (10 * 3600));
-      auto work_time = omp::to_seconds_hours(random.gen_int(2, 4));
-      if (sched->hour_of_day() < 18) {
-        sched->add_event(work_time, this, eating);
-      } else {
-        sched->add_event(work_time, this, going_home);
-      }
-    } else if (id == going_home) {
+    } else if (id == Bureaucrat::lunch_break) {
+      // lunch, then back to work.
+      auto lunch_time = omp::to_seconds_mins(random.gen_int(20, 40));
+      sched->add_event(lunch_time, this, working);
+    } else if (id == Bureaucrat::go_home) {
       auto move_time = omp::to_seconds_mins(random.gen_int(15, 80));
       sched->add_event(move_time, this, relaxing);
     } else if (id == relaxing) {
+      // watch some tv then go to sleep.
       auto relax_time = omp::to_seconds_mins(random.gen_int(60, 90));
       sched->add_event(relax_time, this, sleeping);
     } else if (id == sleeping) {
+      // dream, then perhaps wake up.
       auto sleep_time = omp::to_seconds_hours(random.gen_int(5, 9));
       sched->add_event(awake, this, sleeping);
     } else {
@@ -97,6 +111,10 @@ protected:
 class PeopleSim : public omp::Simulation {
   std::vector<std::unique_ptr<Person>> people_;
 
+public:
+  PeopleSim() : omp::Simulation(10) {}
+
+private:
   int prime(omp::Scheduler* sched) override {
     for (int ix = 0; ix != 10; ++ix) {
       people_.push_back(std::make_unique<Person>(sched));
