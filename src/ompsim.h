@@ -144,11 +144,40 @@ public:
   bool operator>(const SimEvent& other) const { return atime_ > other.atime_; }
 };
 
-class Scheduler {
-  std::priority_queue<SimEvent, std::vector<SimEvent>, std::greater<SimEvent>> pqueue_;
+
+class DailyTimeTable : public Actor {
+  struct Node {
+    Actor* actor;
+    uint32_t id;
+  };
+
+  int every_;
+  Scheduler* sched_;
+  std::vector<std::forward_list<Node>> nodes_;
 
 public:
-  Scheduler() { }
+  DailyTimeTable(int every_mins, Scheduler* sched) 
+      : every_(every_mins),
+        sched_(sched),
+        nodes_(24 * 60 / every_mins) {
+  }
+
+  void add_event(Actor* actor, int when_mins, uint32_t id);
+  void remove_actor(const Actor* actor) ;
+
+private:
+  void on_event(Scheduler* sched, SimTime btime, uint32_t slot) override;
+};
+
+class Scheduler {
+  std::priority_queue<
+      SimEvent, std::vector<SimEvent>, std::greater<SimEvent>> pqueue_;
+  DailyTimeTable time_table_;
+
+public:
+  Scheduler(int minutes_in_tt) 
+      : time_table_(minutes_in_tt, this) {
+  }
 
   bool empty() const { return pqueue_.empty(); }
 
@@ -168,54 +197,15 @@ public:
   int hour_of_day() const {
     return int(SimTime::now().as_seconds() / 3600 ) % 24;
   }
+
+  DailyTimeTable& time_table() { return time_table_; }
 };
-
-class DailyTimeTable : public Actor {
-  struct Node {
-    Actor* actor;
-    uint32_t id;
-  };
-
-  int every_;
-  std::vector<std::forward_list<Node>> nodes_;
-
-public:
-  DailyTimeTable(int every_mins) 
-      : every_(every_mins), nodes_(24 * 60 / every_mins) {
-  }
-
-  void add_event(Scheduler* sched, Actor* actor, int when_mins, uint32_t id) {
-    auto slot =  when_mins / every_;
-    if (nodes_[slot].empty())
-      sched->add_event(to_seconds_mins(slot * every_), this, slot);
-    nodes_[slot].push_front({actor, id});
-  }
-
-  void remove_actor(const Actor* actor) {
-    for (auto& slot : nodes_) {
-      std::remove_if(begin(slot), end(slot), [actor](const Node& node) {
-        return actor == node.actor;
-      });
-    }
-  }
-
-private:
-  void on_event(Scheduler* sched, SimTime btime, uint32_t slot) override {
-    if (nodes_[slot].empty())
-      return;
-    for (auto& node : nodes_[slot]) {
-      node.actor->on_event(sched, btime, node.id);
-    }
-    sched->add_event(to_seconds_hours(24), this, slot);
-  }
-};
-
 
 class Simulation {
   Scheduler sched_;
 
 public:
-  Simulation()  {
+  Simulation(int minutes_in_tt)  : sched_(minutes_in_tt) {
     SimTime::init_master();
   }
 
@@ -245,5 +235,32 @@ private:
   }
 
 };
+
+// DailyTimeTable implementation. ///////////////////////////////////////////
+
+void DailyTimeTable::add_event(Actor* actor, int when_mins, uint32_t id) {
+  auto slot =  when_mins / every_;
+  if (nodes_[slot].empty())
+    sched_->add_event(to_seconds_mins(slot * every_), this, slot);
+  nodes_[slot].push_front({actor, id});
+}
+
+void DailyTimeTable::remove_actor(const Actor* actor) {
+  for (auto& slot : nodes_) {
+    std::remove_if(begin(slot), end(slot), [actor](const Node& node) {
+      return actor == node.actor;
+    });
+  }
+}
+
+void DailyTimeTable::on_event(Scheduler* sched, SimTime btime, uint32_t slot) {
+  if (nodes_[slot].empty())
+    return;
+  for (auto& node : nodes_[slot]) {
+    node.actor->on_event(sched, btime, node.id);
+  }
+  sched->add_event(to_seconds_hours(24), this, slot);
+}
+
 
 }  // namespace omp.
