@@ -6,6 +6,7 @@
 #include <functional>
 #include <random>
 #include <string>
+#include <unordered_map>
 
 #include "omp_utils.h"
 
@@ -27,6 +28,11 @@ T to_seconds_hours(T hours) {
 template <typename T>
 T to_seconds_mins(T minutes) {
   return 60 * minutes;
+}
+
+template <typename T>
+T to_seconds_us(T useconds) {
+  return useconds / 1000000;
 }
 
 int to_minutes_hhmm(char hour, char mins) {
@@ -140,6 +146,7 @@ public:
   }
 
   SimTime when() const { return atime_; }
+  uint32_t id() const { return id_; }
 
   bool operator>(const SimEvent& other) const { return atime_ > other.atime_; }
 };
@@ -169,14 +176,60 @@ private:
   void on_event(Scheduler* sched, SimTime btime, uint32_t slot) override;
 };
 
+class EventStats {
+  using EvCnt = std::vector<std::pair<uint32_t, uint32_t>>;
+  std::vector<std::shared_ptr<EvCnt>> history_;
+  std::unordered_map<uint32_t, uint32_t> period_counts_;
+  int period_secs_;
+  SimTime last_;
+
+public:
+  EventStats(int period_secs) : period_secs_(period_secs) {
+  }
+
+  void add(uint32_t id, const SimTime& when) {
+    auto delta = to_seconds_us(when - last_);
+    if (delta > period_secs_) {
+      collect();
+    } else {
+      ++period_counts_[id];
+    }
+  }
+
+  void collect() {
+    auto e_c = std::make_shared<EvCnt>();
+    e_c->reserve(period_counts_.size());
+    for (const auto& pair : period_counts_) {
+      // first is the event id, second is the count.
+      e_c->emplace_back(pair.first, pair.second);
+    }
+    history_.push_back(e_c);
+    period_counts_.clear();
+  }
+
+  size_t bucket_count() const {  return history_.size(); }
+
+  std::vector<uint32_t> event_count(uint32_t ev_id) {
+    std::vector<uint32_t> rv;
+    for (const auto& bucket : history_) {
+      for (const auto& p : *bucket) {
+        if (p.first == ev_id)
+          rv.push_back(p.second);
+      }
+    }
+  }
+};
+
 class Scheduler {
   std::priority_queue<
       SimEvent, std::vector<SimEvent>, std::greater<SimEvent>> pqueue_;
   DailyTimeTable time_table_;
+  EventStats event_stats_;
 
 public:
-  Scheduler(int minutes_in_tt) 
-      : time_table_(minutes_in_tt, this) {
+  Scheduler(int timetable_mins, int stats_period_mins) 
+      : time_table_(timetable_mins, this),
+        event_stats_(stats_period_mins) {
   }
 
   bool empty() const { return pqueue_.empty(); }
@@ -186,6 +239,7 @@ public:
     SimTime::set(ev.when());
     ev.run(this);
     pqueue_.pop();
+    event_stats_.add(ev.id(), SimTime::now());
     return !pqueue_.empty();
   }
 
@@ -205,7 +259,8 @@ class Simulation {
   Scheduler sched_;
 
 public:
-  Simulation(int minutes_in_tt)  : sched_(minutes_in_tt) {
+  Simulation(int timetable_mins, int stats_period_mins) 
+    : sched_(timetable_mins, stats_period_mins) {
     SimTime::init_master();
   }
 
