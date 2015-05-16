@@ -15,10 +15,12 @@ omp::RandomUniform random;
 
 class Bureaucrat {
 public:
-  enum {
-    go_work = __LINE__,
+  enum States {
+    none = __LINE__,
+    go_work,
     lunch_break,
-    go_home
+    go_home,
+    last_id
   };
 
   static void become(omp::Scheduler* sched, omp::Actor* actor, int travel_time_am_min) {
@@ -35,18 +37,17 @@ class Person : public omp::Actor {
   int age_;      // days.
   int energy_;   // calories.
   int weight_;   // lbs.
-
   int prev_;     // previous event.
 
 public:
   enum States {
     none = __LINE__,
-    dead,
     sleeping,
     awake,
     breakfasting,
     working,
     relaxing,
+    last_id,
   };
 
   Person() = delete;
@@ -77,10 +78,17 @@ protected:
       auto awake_time = omp::to_seconds_mins(random.gen_int(30, 60));
       sched->add_event(awake_time, this, breakfasting);
     } else if (id == breakfasting) {
+      // breakfast just increases energy.
       energy_ += random.gen_int(300, 800);
     } else if (id == Bureaucrat::go_work) {
       // conmute then work.
       auto move_time = omp::to_seconds_mins(random.gen_int(15, 80));
+      if (prev_ == sleeping) {
+        // this event can arrive before we normally wake up! so we
+        // skip breakfast start conmuting a bit late.
+        move_time += omp::to_seconds_mins(15);
+        energy_ -= 100;
+      }
       sched->add_event(move_time, this, working);
     } else if (id == working) {
       // work, possibly until lunch break.
@@ -97,7 +105,8 @@ protected:
       auto relax_time = omp::to_seconds_mins(random.gen_int(60, 90));
       sched->add_event(relax_time, this, sleeping);
     } else if (id == sleeping) {
-      // dream, then perhaps wake up.
+      // dream, then perhaps wake up. it is possible to sleep more than
+      // allowable for a breakfast.
       auto sleep_time = omp::to_seconds_hours(random.gen_int(5, 9));
       sched->add_event(awake, this, sleeping);
     } else {
@@ -112,7 +121,8 @@ class PeopleSim : public omp::Simulation {
   std::vector<std::unique_ptr<Person>> people_;
 
 public:
-  PeopleSim() : omp::Simulation(10) {}
+  // timetable : 10 mins, stats: 5 mins.
+  PeopleSim() : omp::Simulation(10, 5) {}
 
 private:
   int prime(omp::Scheduler* sched) override {
