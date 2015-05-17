@@ -65,6 +65,7 @@ public:
     // first event.
     auto wakeup_time = omp::to_seconds_hours(random.gen_int(4, 7));
     sched->add_event(wakeup_time, this, awake);
+    prev_ = sleeping;
   }
 
 protected:
@@ -110,7 +111,7 @@ protected:
       // dream, then perhaps wake up. it is possible to sleep more than
       // allowable for a breakfast.
       auto sleep_time = omp::to_seconds_hours(random.gen_int(5, 9));
-      sched->add_event(awake, this, sleeping);
+      sched->add_event(sleep_time, this, awake);
     } else {
       __debugbreak();
     }
@@ -142,7 +143,7 @@ DWORD WINAPI SpawnSimulation(void* ctx) {
 
   if (ctx) {
     PeopleSim simulation;
-    auto rv = simulation.run(3600 * 30);
+    auto rv = simulation.run(omp::to_seconds_hours(24 * 5));
     ::PostThreadMessage(tid, kDoneMSG, 0, 0);
     return rv;
   } else {
