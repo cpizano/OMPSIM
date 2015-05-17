@@ -96,6 +96,7 @@ protected:
       energy_ -= 15 * int((omp::SimTime::now() - btime) / (10 * 3600));
     } else if (id == Bureaucrat::lunch_break) {
       // lunch, then back to work.
+      energy_ += random.gen_int(500, 1000);
       auto lunch_time = omp::to_seconds_mins(random.gen_int(20, 40));
       sched->add_event(lunch_time, this, working);
     } else if (id == Bureaucrat::go_home) {
