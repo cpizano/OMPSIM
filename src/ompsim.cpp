@@ -60,10 +60,11 @@ public:
     age_ = omp::to_days_years(random.gen_int(20, 90));
     weight_ = random.gen_int(90, 220);
     energy_ = 2 * (weight_ * 13);
-    auto wakeup_time = omp::to_seconds_hours(random.gen_int(4, 7));
-    sched->add_event(wakeup_time, this, awake);
     // born a a bureaucrat.
     Bureaucrat::become(sched, this, 10);
+    // first event.
+    auto wakeup_time = omp::to_seconds_hours(random.gen_int(4, 7));
+    sched->add_event(wakeup_time, this, awake);
   }
 
 protected:

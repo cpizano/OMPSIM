@@ -36,8 +36,8 @@ T to_seconds_us(T useconds) {
 }
 
 template <typename T>
-T to_useconds_seconds(T seconds) {
-  return 1000000 * seconds;
+int64_t to_useconds_seconds(T seconds) {
+  return 1000000 * int64_t(seconds);
 }
 
 int to_minutes_hhmm(char hour, char mins) {
