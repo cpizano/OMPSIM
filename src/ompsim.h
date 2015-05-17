@@ -54,7 +54,7 @@ public:
 };
 
 
-// Represents time in microseconds. That is about 292K years.
+// Represents time in microseconds. That is about 580K years.
 class SimTime {
   int64_t st_;
   static SimTime* g_master;
@@ -78,7 +78,7 @@ public:
 
   SimTime() : st_(0) {}
   explicit SimTime(int64_t u_seconds) :st_(u_seconds) {}
-  int64_t as_seconds() const { return st_ / 100; }
+  int64_t as_seconds() const { return to_seconds_us(st_); }
 
   bool operator==(const SimTime& other) const { return st_ == other.st_; }
   bool operator<(const SimTime& other) const { return st_ < other.st_; }
@@ -98,18 +98,16 @@ public:
   }
 
   std::string format() const {
-    auto fus  = st_ % 100;
-    auto sec = st_ / 100;
+    auto ds  = st_ % 100000;
+    auto sec = to_seconds_us(st_);
     auto min = sec / 60;
-    if (min < 60) {
-      return StringFmt("%dm:%d.%ds", min, sec % 60, fus);
-    }
-
+    if (min < 60)
+      return StringFmt("%dm:%d.%ds", min, sec % 60, ds);
+    // longer time requires less presicsion.
     auto hrs = min / 60;
     auto dys = hrs / 24;
-    if (dys < 30) {
+    if (dys < 30)
       return StringFmt("%dd %dh:%dm:%ds", dys, hrs % 24, min % 60, sec % 60);
-    }
 
     return "??";
   }
