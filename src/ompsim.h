@@ -35,6 +35,11 @@ T to_seconds_us(T useconds) {
   return useconds / 1000000;
 }
 
+template <typename T>
+T to_useconds_seconds(T seconds) {
+  return 1000000 * seconds;
+}
+
 int to_minutes_hhmm(char hour, char mins) {
   return (60 * hour) + mins;
 }
@@ -242,7 +247,7 @@ public:
   }
 
   void add_event(int delta_seconds, Actor* actor, uint32_t id) {
-    auto activation_time = SimTime::now() + (100 * uint64_t(delta_seconds));
+    auto activation_time = SimTime::now() + to_useconds_seconds(delta_seconds);
     pqueue_.emplace(activation_time, actor, id);
   }
 
@@ -273,7 +278,7 @@ public:
     }
 
     // Simulate until no more events pending or end-of-time.
-    SimTime max_time(max_seconds * 100);
+    SimTime max_time(to_useconds_seconds(max_seconds));
     while (SimTime::now() < max_time) {
       if (!sched_.run_top())
         break;
