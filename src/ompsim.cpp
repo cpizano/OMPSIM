@@ -75,10 +75,16 @@ protected:
     auto t2 = sched->hour_of_day();
 
     if (id == awake) {
-      // cleanup then eat.
-      energy_ -= 15 * int((omp::SimTime::now() - btime) / (10 * 3600));
-      auto awake_time = omp::to_seconds_mins(random.gen_int(30, 60));
-      sched->add_event(awake_time, this, breakfasting);
+      if (sched->hour_of_day() < 4) {
+        // woke up too early. whatch some tv and then go back to sleep.
+        auto night_owl_time = omp::to_seconds_mins(random.gen_int(60, 120));
+        sched->add_event(night_owl_time, this, sleeping);
+      } else {
+        // cleanup then eat.
+        energy_ -= 15 * int((omp::SimTime::now() - btime) / (10 * 3600));
+        auto awake_time = omp::to_seconds_mins(random.gen_int(30, 60));
+        sched->add_event(awake_time, this, breakfasting);
+      }
     } else if (id == breakfasting) {
       // breakfast just increases energy.
       energy_ += random.gen_int(300, 800);
@@ -101,16 +107,18 @@ protected:
       auto lunch_time = omp::to_seconds_mins(random.gen_int(20, 40));
       sched->add_event(lunch_time, this, working);
     } else if (id == Bureaucrat::go_home) {
-      auto move_time = omp::to_seconds_mins(random.gen_int(15, 80));
+      auto move_time = omp::to_seconds_mins(random.gen_int(20, 80));
       sched->add_event(move_time, this, relaxing);
     } else if (id == relaxing) {
       // watch some tv then go to sleep.
-      auto relax_time = omp::to_seconds_mins(random.gen_int(60, 90));
+      auto relax_time = sched->hour_of_day() < 20 ?
+          omp::to_seconds_mins(random.gen_int(90, 180)) :
+          omp::to_seconds_mins(random.gen_int(80, 90));
       sched->add_event(relax_time, this, sleeping);
     } else if (id == sleeping) {
       // dream, then perhaps wake up. it is possible to sleep more than
       // allowable for a breakfast.
-      auto sleep_time = omp::to_seconds_hours(random.gen_int(5, 9));
+      auto sleep_time = omp::to_seconds_hours(random.gen_int(6, 10));
       sched->add_event(sleep_time, this, awake);
     } else {
       __debugbreak();
