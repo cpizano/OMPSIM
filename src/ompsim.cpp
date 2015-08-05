@@ -69,7 +69,7 @@ public:
   }
 
 protected:
-  void on_event(omp::Scheduler* sched, omp::SimTime btime, uint32_t id) override {
+  void on_event(omp::Scheduler* sched, const omp::SimTime& btime, uint32_t id) override {
     auto t0 = btime.format();
     auto t1 = omp::SimTime::now().format();
     auto t2 = sched->hour_of_day();

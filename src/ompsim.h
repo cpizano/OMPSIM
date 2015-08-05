@@ -123,7 +123,7 @@ class Scheduler;
 class Actor {
 public:
   virtual ~Actor() {}
-  virtual void on_event(Scheduler* sched, SimTime btime, uint32_t id) = 0;
+  virtual void on_event(Scheduler* sched, const SimTime& btime, uint32_t id) = 0;
 };
 
 class SimEvent {
@@ -176,7 +176,7 @@ public:
   void remove_actor(const Actor* actor) ;
 
 private:
-  void on_event(Scheduler* sched, SimTime btime, uint32_t slot) override;
+  void on_event(Scheduler* sched, const SimTime& btime, uint32_t slot) override;
 };
 
 class EventStats {
@@ -241,8 +241,8 @@ public:
     auto& ev = pqueue_.top();
     SimTime::set(ev.when());
     ev.run(this);
-    pqueue_.pop();
     event_stats_.add(ev.id(), SimTime::now());
+    pqueue_.pop();
     return !pqueue_.empty();
   }
 
@@ -311,7 +311,7 @@ void DailyTimeTable::remove_actor(const Actor* actor) {
   }
 }
 
-void DailyTimeTable::on_event(Scheduler* sched, SimTime btime, uint32_t slot) {
+void DailyTimeTable::on_event(Scheduler* sched, const SimTime& btime, uint32_t slot) {
   if (nodes_[slot].empty())
     return;
   for (auto& node : nodes_[slot]) {
