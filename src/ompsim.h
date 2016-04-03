@@ -238,7 +238,7 @@ public:
   bool empty() const { return pqueue_.empty(); }
 
   bool run_top() { 
-    auto& ev = pqueue_.top();
+    auto ev = pqueue_.top();
     SimTime::set(ev.when());
     ev.run(this);
     event_stats_.add(ev.id(), SimTime::now());

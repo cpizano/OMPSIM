@@ -135,6 +135,9 @@ public:
   // timetable : 10 mins, stats: 5 mins.
   PeopleSim() : omp::Simulation(10, 5) {}
 
+  ~PeopleSim() {
+  }
+
 private:
   int prime(omp::Scheduler* sched) override {
     for (int ix = 0; ix != 10; ++ix) {
@@ -148,15 +151,16 @@ const DWORD kDoneMSG = 6666;
 
 DWORD WINAPI SpawnSimulation(void* ctx) {
   static DWORD tid = ::GetCurrentThreadId();
+  static HANDLE thread = 0;
 
   if (ctx) {
     PeopleSim simulation;
     auto rv = simulation.run(omp::to_seconds_hours(24 * 5));
-    ::PostThreadMessage(tid, kDoneMSG, 0, 0);
+    ::PostThreadMessageW(tid, kDoneMSG, 0, LONG_PTR(thread));
     return rv;
   } else {
-    auto th = ::CreateThread(NULL, 0, &SpawnSimulation, &tid, 0, nullptr);
-    return th? 1 : 0;
+    thread = ::CreateThread(NULL, 0, &SpawnSimulation, &tid, 0, nullptr);
+    return thread? 1 : 0;
   }
 }
 
@@ -170,7 +174,11 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE,
 
   while (::GetMessage(&msg, NULL, 0, 0)) {
     if (msg.message == kDoneMSG) {
-      ::PostQuitMessage(0);
+      auto rv = WaitForSingleObject(HANDLE(msg.lParam), INFINITE);
+      if (rv != 0)
+        __debugbreak();
+      else
+        ::PostQuitMessage(0);
     }
     ::DispatchMessage(&msg);
   }
